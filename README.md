@@ -8,7 +8,7 @@ Aplicação Android desenvolvida em **Kotlin** e **Jetpack Compose** para leitur
 
 |                           Tela de Lista da Frota                            |                                 Detalhe do Dispositivo                                 |                               Filtro e Favoritos                                |
 |:---------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------:|
-| <img src="files/Lista-dispositivos.jpeg" width="280" alt="Tela de Lista" /> | <img src="files/Detalhes-dispositivo.jpeg" width="280" alt="Detalhe do Dispositivo" /> | <img src="files/Filtros-favoritos.jpeg" width="280" alt="Filtro e Favoritos" /> |
+| <img src="files/Lista-dispositivos.jpeg" width="280" alt="Tela de Lista" /> | <img src="files/Detalhes-Dispositivo.jpeg" width="280" alt="Detalhe do Dispositivo" /> | <img src="files/Filtros-Favoritos.jpeg" width="280" alt="Filtro e Favoritos" /> |
 
 ---
 
