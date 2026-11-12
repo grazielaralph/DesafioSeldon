@@ -4,6 +4,14 @@ Aplicação Android desenvolvida em **Kotlin** e **Jetpack Compose** para leitur
 
 ---
 
+## 📱 Capturas de Tela (Screenshots)
+
+| Tela de Lista da Frota | Detalhe do Dispositivo | Filtro e Favoritos |
+| :---: | :---: | :---: |
+| <img src="files/WhatsApp%20Image%202026-11-12%20at%2018.35.51.jpeg" width="280" alt="Tela de Lista" /> | <img src="files/WhatsApp%20Image%202026-11-12%20at%2018.35.52.jpeg" width="280" alt="Detalhe do Dispositivo" /> | <img src="files/WhatsApp%20Image%202026-11-12%20at%2018.35.52%20(1).jpeg" width="280" alt="Filtro e Favoritos" /> |
+
+---
+
 ## 🛠️ Como Executar o Projeto
 
 ### Pré-requisitos
