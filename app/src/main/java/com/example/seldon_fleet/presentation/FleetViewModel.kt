@@ -2,52 +2,48 @@ package com.example.seldon_fleet.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.seldon_fleet.domain.ClassifyDevice
-import com.example.seldon_fleet.domain.Decision
 import com.example.seldon_fleet.domain.Device
+import com.example.seldon_fleet.domain.Decision
 import com.example.seldon_fleet.domain.DeviceRepository
+import com.example.seldon_fleet.domain.ClassifyDevice // Ajuste o import se a sua regra estiver noutra pasta
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// 1. Definir os estados possíveis do ecrã
-sealed class FleetUiState {
-    object Loading : FleetUiState()
-    data class Success(val devices: List<Pair<Device, Decision>>) : FleetUiState()
-    data class Error(val message: String) : FleetUiState()
-}
-
-// 2. Criar o ViewModel
 class FleetViewModel(
     private val repository: DeviceRepository,
-    private val classifyDevice: ClassifyDevice
+    private val classifyDevice: ClassifyDevice = ClassifyDevice() // A sua regra de negócio
 ) : ViewModel() {
 
+    // Agora o compilador já reconhece o FleetUiState
     private val _uiState = MutableStateFlow<FleetUiState>(FleetUiState.Loading)
-    val uiState: StateFlow<FleetUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<FleetUiState> = _uiState
 
     init {
-        loadFleet()
-    }
-
-    private fun loadFleet() {
         viewModelScope.launch {
-            _uiState.value = FleetUiState.Loading
-            try {
-                // Pede os dados ao repositório
-                val rawDevices = repository.load()
-
-                // Passa cada dispositivo pela regra de negócio do Domínio
-                val classifiedList = rawDevices.map { device ->
-                    Pair(device, classifyDevice(device)) // Une o dispositivo ao seu Status/Justificativa
+            // Fica à escuta do DataStore continuamente
+            repository.observeDevices().collect { devices ->
+                // Aplica a regra de negócio a cada dispositivo para criar o Par (Device, Decision)
+                val devicesWithDecisions = devices.map { device ->
+                    Pair(device, classifyDevice(device))
                 }
 
-                // Atualiza a UI com sucesso
-                _uiState.value = FleetUiState.Success(classifiedList)
-            } catch (e: Exception) {
-                _uiState.value = FleetUiState.Error("Erro ao carregar dados: ${e.message}")
+                // Envia para o ecrã o estado de Sucesso
+                _uiState.value = FleetUiState.Success(devicesWithDecisions)
             }
         }
     }
+
+    fun toggleFavorite(deviceId: String) {
+        viewModelScope.launch {
+            repository.toggleFavorite(deviceId)
+        }
+    }
+}
+
+// === ADICIONADO AQUI: A definição dos estados que a UI espera ===
+sealed interface FleetUiState {
+    object Loading : FleetUiState
+    data class Error(val message: String) : FleetUiState
+    data class Success(val devices: List<Pair<Device, Decision>>) : FleetUiState
 }

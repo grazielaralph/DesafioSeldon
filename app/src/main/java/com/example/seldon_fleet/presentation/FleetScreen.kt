@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.example.seldon_fleet.domain.Decision
 import com.example.seldon_fleet.domain.Device
 import com.example.seldon_fleet.domain.DeviceStatus
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +68,8 @@ fun FleetScreen(
                             DeviceCard(
                                 device = device,
                                 decision = decision,
-                                onClick = { onDeviceClick(device.id) }
+                                onClick = { onDeviceClick(device.id) },
+                                onFavoriteClick = { viewModel.toggleFavorite(device.id) }
                             )
                         }
                     }
@@ -79,7 +83,8 @@ fun FleetScreen(
 fun DeviceCard(
     device: Device,
     decision: Decision,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit
 ) {
     // Mapeia o status para uma cor visual
     val statusColor = when (decision.status) {
@@ -133,6 +138,15 @@ fun DeviceCard(
                 color = statusColor,
                 fontWeight = FontWeight.Bold
             )
+
+            // Botão de Favorito
+            IconButton(onClick = onFavoriteClick) {
+                Icon(
+                    imageVector = if (device.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = "Favorito",
+                    tint = if (device.isFavorite) Color(0xFFFFC107) else Color.Gray
+                )
+            }
         }
     }
 }

@@ -1,13 +1,19 @@
 package com.example.seldon_fleet.domain
 
+import kotlinx.coroutines.flow.Flow
+
 data class Device(
     val id: String, val model: String, val soc: String, val tier: String, val ramMb: Int,
     val androidApi: Int, val batteryCapacityMah: Int?, val batteryLevelPct: Int,
     val screenOnMinutes: Int?, val energyMah: Double?, val jankFramesPct: Double?,
-    val crashCount7d: Int?, val lastSeen: String
+    val crashCount7d: Int?, val lastSeen: String, val isFavorite: Boolean = false
 )
 
-interface DeviceRepository { fun load(): List<Device> }
+interface DeviceRepository {
+
+    fun observeDevices(): Flow<List<Device>>
+    suspend fun toggleFavorite(deviceId: String)
+}
 interface FavoriteRepository { fun load(): Set<String>; fun save(ids: Set<String>) }
 
 enum class DeviceStatus { INDETERMINADO, CRITICO, ATENCAO, OK }
