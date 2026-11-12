@@ -60,6 +60,6 @@ Se este projeto fosse evoluir para um produto de produção, as seguintes etapas
 ## 🤖 Declaração de Uso de IA (Seção 11)
 
 Em conformidade com a política de transparência do desafio:
-- **Ferramentas Utilizadas:** Assistente AI do Android Studio.
+- **Ferramentas Utilizadas:** Assistente AI do Android Studio e gemini-3.1-pro-preview
 - **Contribuição da IA:** Utilizada no auxílio de geração de boilerplate de UI em Compose, formatação de arquivos Markdown e estruturação de casos de testes unitários.
 - **Raciocínio Humano:** A definição das decisões de arquitetura em camadas, regras de precedência da classificação do domínio, limites de tolerância e tratamento dos defeitos de dados da telemetria foram concebidos e validados diretamente pelo desenvolvedor responsável.
