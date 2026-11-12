@@ -5,12 +5,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.seldon_fleet.data.repository.DeviceRepositoryImpl
 import com.example.seldon_fleet.domain.ClassifyDevice
+import com.example.seldon_fleet.presentation.DeviceDetailScreen
 import com.example.seldon_fleet.presentation.FleetScreen
+import com.example.seldon_fleet.presentation.FleetUiState
 import com.example.seldon_fleet.presentation.FleetViewModel
 import com.example.seldon_fleet.ui.theme.SeldonfleetTheme
 
@@ -31,7 +38,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            SeldonFleetTheme {
+            SeldonfleetTheme() {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     val viewModel: FleetViewModel = viewModel(factory = viewModelFactory)
                     val uiState by viewModel.uiState.collectAsState()
