@@ -1,0 +1,40 @@
+name: Seldon Fleet CI
+
+# Executa este pipeline toda vez que você fizer um 'push' para a branch 'main' (ou 'master')
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build_and_test:
+    name: Análise Estática e Testes
+    runs-on: ubuntu-latest # Roda num servidor Linux rápido e sem emulador
+
+    steps:
+      # 1. Baixa o seu código para o servidor do GitHub
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # 2. Prepara o ambiente Java (JDK 17 é o padrão para projetos Compose recentes)
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle # Faz cache do Gradle para rodar mais rápido nas próximas vezes
+
+      # 3. Dá permissão de execução ao Gradle
+      - name: Permissão para o Gradle Wrapper
+        run: chmod +x gradlew
+
+      # 4. PASSO 1 DO DESAFIO: Análise Estática (Lint)
+      - name: Rodar Análise Estática (Lint)
+        run: ./gradlew lint
+        # Nota: Se você instalou o ktlint ou detekt no projeto, pode trocar 
+        # para ./gradlew ktlintCheck ou ./gradlew detekt
+
+      # 5. PASSO 2 DO DESAFIO: Testes Unitários na JVM (REQ-08 e REQ-09)
+      - name: Rodar Testes Unitários
+        run: ./gradlew test
