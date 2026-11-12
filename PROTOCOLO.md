@@ -1,42 +1,54 @@
-# Protocolo Seldon Fleet
+# Protocolo de Decisões Seldon Fleet
 
-Este documento descreve as regras de negócio adotadas para a classificação da frota, o histórico de tratamento de defeitos encontrados durante o desenvolvimento e as ameaças à validade da solução implementada, cumprindo o REQ-10.
+Este documento cumpre o **REQ-10** da especificação técnica do desafio Seldon Fleet, detalhando a regra de classificação adotada, o tratamento concedido a cada um dos defeitos presentes nos dados da telemetria (Seção 3.3) e a análise de ameaças à validade das conclusões.
 
-## 1. Regra Adotada (Lógica de Classificação)
+---
 
-A classificação da saúde de cada dispositivo da frota é realizada na Camada de Domínio (Clean Architecture), resultando em um de quatro estados possíveis: **OK**, **ATENÇÃO**, **CRÍTICO** ou **INDETERMINADO**. A regra adotada avalia múltiplas métricas do dispositivo de forma sequencial:
+## 1. Regra de Classificação Adotada e Raciocínio
 
-1. **Estado CRÍTICO:** Atribuído se o dispositivo apresenta falhas severas de estabilidade (ex: `crashCount7d` acima de um limite aceitável) ou se o nível de bateria (`batteryLevelPct`) está perigosamente baixo comprometendo a operação imediata.
-2. **Estado ATENÇÃO:** Atribuído se o dispositivo não é crítico, mas apresenta degradação de performance (ex: alta percentagem de *Jank Frames*) ou um consumo de energia anômalo para o tempo de ecrã ativo (`screenOnMinutes`).
-3. **Estado OK:** Atribuído aos dispositivos que operam dentro dos parâmetros normais de estabilidade, bateria e performance, sem violar as regras anteriores.
-4. **Estado INDETERMINADO:** Fallback utilizado caso as métricas cruciais para a avaliação venham zeradas, nulas ou num formato inconsistente, impedindo um diagnóstico seguro.
+A classificação da saúde dos dispositivos da frota é realizada na camada de Domínio (`domain/`), operando em Kotlin puro sem dependências do Android.
 
-Cada classificação gera um objeto `Decision` que contém o status e uma `reason` (motivo descritivo), garantindo transparência na interface de detalhes.
+### 1.1 — Normalização e Derivadas
+Antes da classificação, calculam-se duas grandezas derivadas:
+1. **Dreno Absoluto ($mAh/h$):**
+   $$\text{drenoAbsoluto} = \frac{\text{energiaMah}}{\text{screenOnMinutes} / 60}$$
+2. **Dreno Relativo ($\%/h$):**
+   $$\text{drenoRelativo} = \left( \frac{\text{drenoAbsoluto}}{\text{batteryCapacityMah}} \right) \times 100$$
 
-## 2. Tratamento dos Defeitos
+**Raciocínio:** O **dreno relativo** é a métrica adotada para a tomada de decisão. Comparar apenas o dreno absoluto entre dispositivos de capacidades distintas gera distorção: consumir $900\text{ mAh/h}$ é um estado catastrófico numa bateria de $3000\text{ mAh}$ ($30\%/h$), mas apenas modesto numa bateria de $5000\text{ mAh}$ ($18\%/h$).
 
-Durante a integração das camadas e construção da UI em Jetpack Compose, os seguintes defeitos foram identificados e mitigados:
+### 1.2 — Limiares e Ordem de Precedência
+A avaliação segue rigorosamente a ordem abaixo. O primeiro critério satisfeito define o estado final:
 
-* **Defeito 1: Dependências e Referências Não Resolvidas**
-  * **Sintoma:** Falhas de compilação apontando `Unresolved reference` para `Gson`, anotações e ícones do Material Design.
-  * **Tratamento:** As bibliotecas não vêm por padrão nos templates modernos do Android Studio. O defeito foi corrigido adicionando `com.google.code.gson:gson` e `androidx.compose.material:material-icons-extended` ao `build.gradle.kts` e sincronizando o projeto.
+| Status no Domínio | Rótulo na UI | Condições de Disparo (Qualquer uma basta) | Significados |
+| :--- | :--- | :--- | :--- |
+| **`INDETERMINADO`** | **`SEM DADOS`** | `batteryCapacityMah <= 0` ou ausente <br> `screenOnMinutes <= 0` ou ausente <br> `energyUnit == mWh` sem `nominalVoltage` válida | Dados insuficientes para cálculo seguro de dreno |
+| **`CRÍTICO`** | **`CRÍTICO`** | `drenoRelativo >= 12.0 %/h` <br> `crashCount7d >= 3` <br> `jankFramesPct >= 15.0 %` | Exige intervenção técnica imediata |
+| **`ATENÇÃO`** | **`ATENÇÃO`** | `drenoRelativo >= 7.0 %/h` <br> `crashCount7d >= 1` <br> `jankFramesPct >= 8.0 %` | Sob observação operacional |
+| **`OK`** | **`OK`** | Nenhuma das condições anteriores | Dispositivo saudável |
 
-* **Defeito 2: Ecrã em Branco (Falha de Parsing do JSON)**
-  * **Sintoma:** A interface carregava corretamente, mas a lista de dispositivos estava vazia (Lista Vazia retornada pelo Repositório).
-  * **Tratamento:** O código inicial assumia que `frota.json` era um *Array* direto (`[ ... ]`). Contudo, o JSON era um *Objeto* (`{ ... }`) contendo metadados e a lista estava na propriedade `"devices"`. Criou-se um Wrapper/Envelope (`FleetResponseDto`) para ler o objeto raiz e extrair a lista corretamente, evitando a exceção silenciosa do Gson.
+---
 
-* **Defeito 3: Falsos Positivos "INDETERMINADO" e Falha no Clique**
-  * **Sintoma:** Todos os cartões renderizavam com status "INDETERMINADO", e as propriedades vitais (como `id`) estavam nulas, impedindo a navegação para os detalhes.
-  * **Tratamento:** Incompatibilidade tipográfica entre as chaves no JSON e as anotações `@SerializedName` na classe `DeviceDto`. As chaves foram corrigidas para respeitar rigorosamente o *camelCase* do JSON (ex: `ramMb` em vez de outro formato). Com os dados devidamente mapeados, o domínio conseguiu calcular as regras (saindo do fallback) e a UI obteve os IDs válidos.
+## 2. Tratamento dos Defeitos dos Dados (Seção 3.3)
 
-* **Defeito 4: Falha na Navegação de Ecrãs (Compose State)**
-  * **Sintoma:** A `MainActivity` não conseguia alternar entre a `FleetScreen` e a `DeviceDetailScreen`.
-  * **Tratamento:** A navegação dependia de estados que não estavam a ser geridos corretamente. Implementou-se uma variável `selectedDeviceId` suportada por `mutableStateOf` e `remember`, juntamente com os imports manuais das funções de estado do Compose. A UI passou a reagir dinamicamente a essa variável para desenhar o ecrã correspondente.
+### Defeito 1 — Unidade de Energia Inconsistente (`mWh` vs `mAh`)
+- **Problema:** Parte dos registros exporta `energyConsumed` em `mWh` e parte em `mAh`. Comparar ou somar os dois sem converter gera um erro de magnitude de aproximadamente $3.85\times$.
+- **Decisão e Tratamento:** No mapeamento para o domínio (`EnergyNormalizer.toMah`), todo valor em `mWh` é convertido para `mAh` utilizando a tensão nominal:
+  $$\text{energyMah} = \frac{\text{energyMwh}}{\text{nominalVoltage}}$$
+  Registros em `mWh` sem `nominalVoltage` válida são marcados com `energyMah = null` e classificados como `INDETERMINADO`.
+
+### Defeito 2 — Registros Incompletos (Divisor Nulo / Capacidade 0)
+- **Problema:** Dispositivos com `batteryCapacityMah = 0` (ou ausente) e `screenOnMinutes = 0` causariam divisão por zero nas derivadas, produzindo `NaN` ou `Infinity`.
+- **Decisão e Tratamento:** Adotou-se o tratamento explícito de **classificação como INDETERMINADO** (`SEM DADOS` na UI). O domínio detecta divisores nulos/inválidos antes de calcular o dreno e interrompe a avaliação sem lançar exceção ou expor valores numéricos inválidos na interface.
+
+---
 
 ## 3. Ameaça à Validade (REQ-10)
 
-Embora a solução implementada atenda aos requisitos funcionais primários, existem limitações contextuais que representam ameaças à sua validade num cenário de produção real:
+### 3.1 — Suposição de Tela Ativa vs. Dreno em Segundo Plano
+A fórmula do dreno relativo assume que todo o consumo de energia registrado (`energyConsumed`) ocorreu exclusivamente durante o tempo em que a tela esteve ativa (`screenOnMinutes`). 
 
-1. **Regras Estáticas vs. Frota Heterogênea:** As regras de classificação de bateria e performance utilizam limiares estáticos (hardcoded). Como a frota é composta por dispositivos de diferentes tiers (*low*, *mid*, *high*) e capacidades de bateria muito díspares, um consumo aceitável para um *Pixel 8* pode ser considerado crítico para um *Moto E22*. A regra estática ameaça a precisão do diagnóstico (falsos positivos/negativos).
-2. **Dados Estáticos (Offline):** A aplicação lê os dados a partir de um ficheiro local (`assets/frota.json`). Num ambiente real de telemetria, as métricas dos dispositivos mudam constantemente. A arquitetura atual precisaria de ser adaptada (ex: Retrofit/WebSockets) para consumir uma API remota, sob o risco de os diagnósticos apresentados estarem obsoletos no momento da leitura.
-3. **Escalabilidade da Interface:** O ecrã inicial renderiza os dispositivos numa `LazyColumn`. Contudo, para frotas massivas (ex: milhares de dispositivos), a ausência de mecanismos de paginação, filtros de pesquisa ou ordenação ameaça a usabilidade da aplicação e a capacidade do utilizador de encontrar rapidamente os telemóveis em estado crítico.
+Se um dispositivo executar serviços pesados em primeiro plano (*foreground services*), tarefas de sincronização em segundo plano ou apresentar falhas no modo *Doze* enquanto a tela estiver desligada, o valor de `energyConsumed` será alto mesmo para um tempo de tela baixo. Isso inflará artificialmente o `drenoRelativo`, podendo gerar **falsos positivos de status CRÍTICO** para aparelhos cujo comportamento com tela acesa era normal.
+
+### 3.2 — Limiares Estáticos em Frota Heterogênea
+Os limiares de $12\%/h$ e $7\%/h$ são estáticos para toda a frota. Em aparelhos de *tier* de entrada (*low tier*), o processador opera com menor eficiência energética sob carga, fazendo com que drenos mais altos sejam normais para a categoria. Aparelhos de *high tier* com telas de alta taxa de atualização podem apresentar padrões de dreno distintos sem representar degradação física da bateria.

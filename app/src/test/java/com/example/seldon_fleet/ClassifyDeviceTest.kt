@@ -1,5 +1,6 @@
 package com.example.seldon_fleet
 
+import com.example.seldon_fleet.data.mapper.EnergyNormalizer
 import com.example.seldon_fleet.domain.ClassifyDevice
 import com.example.seldon_fleet.domain.Device
 import com.example.seldon_fleet.domain.DeviceStatus
@@ -15,14 +16,13 @@ class ClassifyDeviceTest {
         classifyDevice = ClassifyDevice()
     }
 
-    // Função auxiliar para criar um dispositivo "base" limpo e OK
     private fun createBaseDevice(): Device {
         return Device(
             id = "DEV-0001",
             model = "Pixel 6a",
             soc = "Tensor G1",
             tier = "mid",
-            ramMb = 6144, // Certifique-se de que no seu Device.kt também está ramMB (maiúsculas)
+            ramMb = 6144,
             androidApi = 34,
             batteryCapacityMah = 5000,
             batteryLevelPct = 80,
@@ -49,14 +49,48 @@ class ClassifyDeviceTest {
     }
 
     @Test
-    fun `quando tempo de tela e zero deve retornar INDETERMINADO`() {
-        val device = createBaseDevice().copy(screenOnMinutes = 0)
-        val decision = classifyDevice(device) // Corrigido aqui
+    fun `quando capacidade da bateria e zero deve retornar INDETERMINADO`() {
+        val device = createBaseDevice().copy(batteryCapacityMah = 0)
+        val decision = classifyDevice(device)
         assertEquals(DeviceStatus.INDETERMINADO, decision.status)
     }
 
     @Test
-    fun `fronteira CRITICO dreno relativo exatamente em 12 pct por h deve retornar CRITICO`() { // Removido o ":"
+    fun `quando tempo de tela e zero deve retornar INDETERMINADO`() {
+        val device = createBaseDevice().copy(screenOnMinutes = 0)
+        val decision = classifyDevice(device)
+        assertEquals(DeviceStatus.INDETERMINADO, decision.status)
+    }
+
+    @Test
+    fun `equivalencia de unidade mesmo consumo em mAh e mWh produz o mesmo status e dreno`() {
+        val energyMahDirect = 980.0
+        val energyMwh = 3773.0
+        val nominalVoltage = 3.85
+        val energyMahConverted = EnergyNormalizer.toMah(energyMwh, "mWh", nominalVoltage)
+
+        assertEquals(energyMahDirect, energyMahConverted!!, 0.001)
+
+        val deviceMah = createBaseDevice().copy(
+            batteryCapacityMah = 4410,
+            screenOnMinutes = 214,
+            energyMah = energyMahDirect
+        )
+        val deviceMwh = createBaseDevice().copy(
+            batteryCapacityMah = 4410,
+            screenOnMinutes = 214,
+            energyMah = energyMahConverted
+        )
+
+        val decisionMah = classifyDevice(deviceMah)
+        val decisionMwh = classifyDevice(deviceMwh)
+
+        assertEquals(decisionMah.status, decisionMwh.status)
+        assertEquals(decisionMah.drainRelative!!, decisionMwh.drainRelative!!, 0.001)
+    }
+
+    @Test
+    fun `fronteira CRITICO dreno relativo exatamente em 12 pct por h deve retornar CRITICO`() {
         val device = createBaseDevice().copy(
             screenOnMinutes = 60,
             energyMah = 600.0
@@ -66,7 +100,7 @@ class ClassifyDeviceTest {
     }
 
     @Test
-    fun `fronteira ATENCAO dreno relativo em 11,9 pct por h deve retornar ATENCAO`() { // Removido o ":"
+    fun `fronteira ATENCAO dreno relativo em 11,9 pct por h deve retornar ATENCAO`() {
         val device = createBaseDevice().copy(
             screenOnMinutes = 60,
             energyMah = 595.0
@@ -76,7 +110,29 @@ class ClassifyDeviceTest {
     }
 
     @Test
-    fun `precedencia sinal critico de falhas deve prevalecer sobre dreno de atencao`() { // Removido o ":"
+    fun `fronteira ATENCAO dreno relativo exatamente em 7,0 pct por h deve retornar ATENCAO`() {
+        val device = createBaseDevice().copy(
+            batteryCapacityMah = 5000,
+            screenOnMinutes = 60,
+            energyMah = 350.0
+        )
+        val decision = classifyDevice(device)
+        assertEquals(DeviceStatus.ATENCAO, decision.status)
+    }
+
+    @Test
+    fun `fronteira OK dreno relativo em 6,9 pct por h deve retornar OK`() {
+        val device = createBaseDevice().copy(
+            batteryCapacityMah = 5000,
+            screenOnMinutes = 60,
+            energyMah = 345.0
+        )
+        val decision = classifyDevice(device)
+        assertEquals(DeviceStatus.OK, decision.status)
+    }
+
+    @Test
+    fun `precedencia sinal critico de falhas deve prevalecer sobre dreno de atencao`() {
         val device = createBaseDevice().copy(
             screenOnMinutes = 60,
             energyMah = 400.0,
